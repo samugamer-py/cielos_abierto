@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0a1118" />
+  <title>Cielos Abiertos · Vuelo 3D</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230c151d'/%3E%3Cpath d='M8 36 56 24 34 38l-4 16-6-14Z' fill='%23ffc46b'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <canvas id="scene" aria-label="Mundo de vuelo 3D"></canvas>
+
+  <!-- ===================== HUD ===================== -->
+  <div id="hud" class="hidden">
+    <div class="hud-top">
+      <div class="hud-brand">CIELOS ABIERTOS</div>
+      <canvas id="compass" width="380" height="68"></canvas>
+      <div id="net-badge" class="net-badge hidden">
+        <i class="dot"></i>
+        <span id="net-text">ONLINE</span>
+      </div>
+    </div>
+
+    <div class="hud-left glass">
+      <div class="readout hero">
+        <span class="lbl">VEL</span>
+        <span class="val" id="hud-speed">0</span>
+        <span class="unit">km/h</span>
+      </div>
+      <div class="readout hero">
+        <span class="lbl">ALT</span>
+        <span class="val" id="hud-alt">0</span>
+        <span class="unit">m</span>
+      </div>
+      <div class="readout">
+        <span class="lbl">AGL</span>
+        <span class="val" id="hud-agl">0</span>
+        <span class="unit">m</span>
+      </div>
+      <div class="readout">
+        <span class="lbl">V/S</span>
+        <span class="val" id="hud-vs">0</span>
+        <span class="unit">m/s</span>
+      </div>
+      <div class="throttle-block">
+        <div class="throttle-label"><span>POTENCIA</span><span id="hud-thr">72%</span></div>
+        <div class="throttle-track"><i id="throttle-fill"></i></div>
+      </div>
+      <div class="hud-state" id="hud-state">EN VUELO</div>
+    </div>
+
+    <div class="hud-center">
+      <div class="reticle">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle cx="60" cy="60" r="22" />
+          <path d="M60 29v14M60 77v14M29 60h14M77 60h14" />
+        </svg>
+      </div>
+      <div id="stall-warning" class="stall hidden">PÉRDIDA · PÉRDIDA</div>
+      <div id="toast" class="toast"></div>
+    </div>
+
+    <div class="hud-right">
+      <div class="roster glass">
+        <div class="roster-title"><span>ESPACIO AÉREO</span><span id="roster-count">1</span></div>
+        <ul id="roster-list"></ul>
+      </div>
+    </div>
+
+    <div class="hud-bottom-left">
+      <div class="keyhints">
+        <span><kbd>W</kbd><kbd>S</kbd> morro</span>
+        <span><kbd>A</kbd><kbd>D</kbd> alabeo</span>
+        <span><kbd>Q</kbd><kbd>E</kbd> guiñada</span>
+        <span><kbd>SHIFT</kbd><kbd>CTRL</kbd> potencia</span>
+        <span><kbd>C</kbd> cámara</span>
+        <span><kbd>ESC</kbd> pausa</span>
+      </div>
+      <div class="chat">
+        <div id="chat-log" class="chat-log"></div>
+        <form id="chat-form" class="chat-form hidden">
+          <span class="chat-prefix">SAY</span>
+          <input id="chat-input" maxlength="140" autocomplete="off" placeholder="Mensaje para el espacio aéreo…" />
+        </form>
+        <div id="chat-hint" class="chat-hint"><kbd>ENTER</kbd> para hablar</div>
+      </div>
+    </div>
+
+    <div class="hud-bottom-right">
+      <div class="map-wrap">
+        <canvas id="minimap" width="200" height="200"></canvas>
+        <div class="map-north">N</div>
+        <div class="map-caption"><span id="map-coords">X 0 · Z 0</span><span id="map-mode">LIBRE</span></div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Controles táctiles: se muestran únicamente durante el vuelo en móviles -->
+  <div id="touch-controls" aria-label="Controles táctiles de vuelo">
+    <div class="touch-left">
+      <div id="flight-stick" class="virtual-stick" aria-label="Joystick de dirección">
+        <div class="stick-ring"></div><div id="stick-knob" class="stick-knob"></div>
+      </div>
+      <span class="touch-caption">DIRECCIÓN</span>
+    </div>
+    <div class="touch-right">
+      <div class="touch-button-row">
+        <button class="touch-button" data-key="KeyQ" aria-label="Guiñada izquierda">↶</button>
+        <button class="touch-button" data-key="KeyE" aria-label="Guiñada derecha">↷</button>
+      </div>
+      <div class="touch-button-row">
+        <button class="touch-button power" data-key="ShiftLeft" aria-label="Aumentar potencia">＋ POT.</button>
+        <button class="touch-button power" data-key="ControlLeft" aria-label="Reducir potencia">－ POT.</button>
+      </div>
+      <div class="touch-button-row">
+        <button class="touch-button" data-key="Space" aria-label="Freno">FRENO</button>
+        <button id="touch-camera" class="touch-button" aria-label="Cambiar cámara">CÁMARA</button>
+      </div>
+    </div>
+    <button id="touch-fullscreen" class="touch-fullscreen" aria-label="Pantalla completa">⛶</button>
+  </div>
+
+  <!-- ===================== MENÚ ===================== -->
+  <div id="loading" class="overlay loading-overlay">
+    <div class="loader-mark">✦</div>
+    <p class="loader-title">PREPARANDO EL CIELO</p>
+    <p class="loader-text" id="loading-text">Generando islas, montañas y nubes…</p>
+    <div class="loader-line"><i></i></div>
+  </div>
+
+  <div id="menu" class="overlay menu-overlay hidden">
+    <div class="menu-scrim"></div>
+    <div class="menu-layout">
+      <header class="menu-head">
+        <div class="eyebrow"><span class="eyebrow-line"></span> SIMULADOR DE VUELO · 3D</div>
+        <h1>CIELOS<br /><em>ABIERTOS</em></h1>
+        <p class="tagline">Despega, explora islas imposibles y comparte el horizonte.<br />Sin descargas. Sin límites de altitud.</p>
+        <div class="menu-badges">
+          <span>MUNDO PROCEDURAL</span>
+          <span>MULTIJUGADOR</span>
+          <span>3 CÁMARAS</span>
+        </div>
+      </header>
+
+      <section class="menu-actions">
+        <div class="panel glass">
+          <div class="panel-head">
+            <span class="panel-kicker">SELECCIONA UNA EXPERIENCIA</span>
+            <span class="panel-version">v1.0</span>
+          </div>
+
+          <button id="btn-free" class="btn primary">
+            <span class="btn-icon">➤</span>
+            <span class="btn-copy"><strong>VUELO LIBRE</strong><small>Explora el archipiélago a tu ritmo</small></span>
+            <span class="btn-arrow">↗</span>
+          </button>
+
+          <button id="btn-online" class="btn">
+            <span class="btn-icon">◉</span>
+            <span class="btn-copy"><strong>MULTIJUGADOR</strong><small>Vuela con otros pilotos en tiempo real</small></span>
+            <span class="btn-arrow">↗</span>
+          </button>
+
+          <div id="online-panel" class="online-panel hidden">
+            <label class="field">
+              <span>INDICATIVO</span>
+              <input id="callsign" maxlength="16" autocomplete="off" spellcheck="false" value="PILOTO" />
+            </label>
+            <label class="field">
+              <span>SERVIDOR</span>
+              <input id="server-url" maxlength="120" autocomplete="off" spellcheck="false" />
+            </label>
+            <div class="online-actions">
+              <button id="btn-connect" class="btn small primary"><span>CONECTAR</span></button>
+              <button id="btn-back" class="btn small ghost">ATRÁS</button>
+            </div>
+            <p id="online-status" class="online-status"></p>
+            <p class="online-help">LAN automática: si abriste esta página con la IP del anfitrión, se conectará a ese servidor. Todos deben usar la misma Wi-Fi. Permite Python en el firewall.</p>
+          </div>
+
+          <div id="menu-hint" class="menu-hint">
+            <span class="pulse"></span>
+            Pulsa <strong>VUELO LIBRE</strong> para despegar al instante
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="menu-foot">
+      <div class="foot-controls">
+        <span><kbd>W</kbd><kbd>S</kbd> morro</span>
+        <span><kbd>A</kbd><kbd>D</kbd> alabeo</span>
+        <span><kbd>SHIFT</kbd><kbd>CTRL</kbd> potencia</span>
+        <span><kbd>RATÓN</kbd> vuelo fino</span>
+        <span><kbd>C</kbd> cámara</span>
+        <span><kbd>R</kbd> reiniciar</span>
+      </div>
+      <div class="foot-note">Un homenaje a los cielos infinitos · WebGL + Three.js</div>
+    </footer>
+  </div>
+
+  <!-- ===================== PAUSA ===================== -->
+  <div id="pause" class="overlay pause-overlay hidden">
+    <div class="modal glass">
+      <span class="modal-kicker">VUELO EN PAUSA</span>
+      <h2>Un momento de calma</h2>
+      <p class="modal-text">El mundo sigue girando ahí fuera. Retoma el mando cuando quieras.</p>
+      <div class="modal-actions">
+        <button id="btn-resume" class="btn primary"><span class="btn-copy"><strong>REANUDAR</strong><small>Volver a la cabina</small></span></button>
+        <button id="btn-pause-menu" class="btn ghost"><span class="btn-copy"><strong>SALIR AL MENÚ</strong><small>Terminar el vuelo</small></span></button>
+      </div>
+      <div class="pause-stats" id="pause-stats"></div>
+      <div class="modal-controls">
+        <span><kbd>W</kbd><kbd>S</kbd> morro</span>
+        <span><kbd>A</kbd><kbd>D</kbd> alabeo</span>
+        <span><kbd>Q</kbd><kbd>E</kbd> guiñada</span>
+        <span><kbd>SHIFT</kbd><kbd>CTRL</kbd> potencia</span>
+        <span><kbd>ESPACIO</kbd> freno</span>
+        <span><kbd>M</kbd> sonido</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== ACCIDENTE ===================== -->
+  <div id="crash" class="overlay crash-overlay hidden">
+    <div class="modal glass crash-modal">
+      <span class="modal-kicker danger">IMPACTO CON EL TERRENO</span>
+      <h2>El cielo te devuelve<br /><em>a tierra</em></h2>
+      <p class="modal-text">La gravedad no negocia. Revisa el horizonte artificial y vuelve a intentarlo.</p>
+      <div class="crash-stats" id="crash-stats"></div>
+      <div class="modal-actions">
+        <button id="btn-retry" class="btn primary"><span class="btn-copy"><strong>REINTENTAR</strong><small>Tecla R</small></span></button>
+        <button id="btn-crash-menu" class="btn ghost"><span class="btn-copy"><strong>MENÚ</strong><small>Volver al inicio</small></span></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="flash" class="flash"></div>
+  <noscript><div class="noscript">Este juego necesita JavaScript y WebGL.</div></noscript>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
